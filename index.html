@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Inner SPARC Project Finder Web App</title>
+    
+    <!-- Favicon for browser tab -->
+    <link rel="icon" type="image/png" href="https://i.imgur.com/TcCQCER.png">
+    <link rel="shortcut icon" type="image/png" href="https://i.imgur.com/TcCQCER.png">
+    
+    <!-- For Apple devices -->
+    <link rel="apple-touch-icon" href="https://i.imgur.com/TcCQCER.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #f4f5fb;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        /* Loading screen */
+        .loading-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #f4f5fb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 0.3s ease;
+        }
+        
+        .loading-content {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-logo {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 20px;
+            background: #222689;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .loading-logo img {
+            width: 80%;
+            height: 80%;
+            object-fit: contain;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border: 3px solid #dde0f0;
+            border-top-color: #222689;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .loading-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #18193a;
+            margin-bottom: 8px;
+        }
+        
+        .loading-sub {
+            font-size: 0.7rem;
+            color: #7b7fa8;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* Iframe styles */
+        #gas-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* Error message */
+        .error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            max-width: 90%;
+            width: 320px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border: 1px solid #f5c2c2;
+            display: none;
+            z-index: 10001;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .error-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #c0392b;
+            margin-bottom: 8px;
+        }
+        
+        .error-text {
+            font-size: 0.75rem;
+            color: #7b7fa8;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+        
+        .error-button {
+            background: #222689;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        
+        .error-button:hover {
+            background: #1a1d6e;
+        }
+        
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .loading-logo {
+                width: 56px;
+                height: 56px;
+            }
+            .loading-title {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container" id="loadingContainer">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <img src="https://i.imgur.com/TcCQCER.png" alt="Inner SPARC">
+            </div>
+            <div class="loading-spinner"></div>
+            <div class="loading-title">Inner SPARC Realty Corporation</div>
+            <div class="loading-sub">Loading Project Finder...</div>
+        </div>
+    </div>
+    
+    <div class="error-message" id="errorMessage">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">Connection Error</div>
+        <div class="error-text" id="errorText">
+            Unable to load the application. Please check your internet connection and try again.
+        </div>
+        <button class="error-button" onclick="location.reload()">Retry</button>
+    </div>
+    
+    <iframe id="gas-iframe" src="about:blank" allow="geolocation; clipboard-read; clipboard-write"></iframe>
+
+    <script>
+        // ⚠️ IMPORTANT: Replace this with your actual Google Apps Script Web App URL
+        const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwDFrFffSYXmmFeAM5kd4x_HB_rW0c2WKv0kMx8yNgo7hJzPHv4784DcbSY3AeyOYgy/exec';
+        
+        const loadingContainer = document.getElementById('loadingContainer');
+        const iframe = document.getElementById('gas-iframe');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        
+        let loadTimeout;
+        let hasLoaded = false;
+        
+        // Function to show error
+        function showError(message) {
+            if (hasLoaded) return;
+            
+            clearTimeout(loadTimeout);
+            loadingContainer.style.opacity = '0';
+            setTimeout(() => {
+                loadingContainer.style.display = 'none';
+                errorText.textContent = message || 'Unable to load the application. Please check your internet connection and try again.';
+                errorMessage.classList.add('show');
+            }, 300);
+        }
+        
+        // Function to handle successful load
+        function onIframeLoad() {
+            if (hasLoaded) return;
+            
+            clearTimeout(loadTimeout);
+            hasLoaded = true;
+            
+            // Fade out loading, fade in iframe
+            loadingContainer.style.opacity = '0';
+            iframe.style.opacity = '1';
+            
+            setTimeout(() => {
+                loadingContainer.style.display = 'none';
+            }, 300);
+        }
+        
+        // Function to handle iframe errors
+        function onIframeError() {
+            if (hasLoaded) return;
+            showError('Failed to load the application. The Google Apps Script web app might be unavailable or the URL is incorrect.');
+        }
+        
+        // Build the full URL with preserved query parameters and hash
+        function buildIframeUrl() {
+            let url = GAS_WEBAPP_URL;
+            
+            // Preserve URL parameters from the wrapper URL
+            const params = new URLSearchParams(window.location.search);
+            const hash = window.location.hash;
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            if (hash) {
+                url += (params.toString() ? '&' : '?') + 'hash=' + encodeURIComponent(hash.substring(1));
+            }
+            
+            return url;
+        }
+        
+        // Set iframe source
+        const iframeUrl = buildIframeUrl();
+        iframe.src = iframeUrl;
+        
+        // Set timeout for loading (15 seconds max)
+        loadTimeout = setTimeout(() => {
+            if (!hasLoaded) {
+                showError('Loading timeout. The application is taking too long to respond. Please try again.');
+            }
+        }, 15000);
+        
+        // Attach iframe event listeners
+        iframe.addEventListener('load', onIframeLoad);
+        iframe.addEventListener('error', onIframeError);
+        
+        // Optional: Handle postMessage communication from the embedded app
+        window.addEventListener('message', function(event) {
+            // Verify origin for security (optional but recommended)
+            if (event.origin !== 'https://script.google.com') return;
+            
+            // Handle different message types from your Apps Script app
+            if (event.data && event.data.type) {
+                switch(event.data.type) {
+                    case 'navigate':
+                        // Update URL without reloading
+                        if (event.data.url && event.data.url !== window.location.pathname) {
+                            history.pushState(null, '', event.data.url);
+                        }
+                        break;
+                    case 'setTitle':
+                        if (event.data.title) {
+                            document.title = event.data.title;
+                        }
+                        break;
+                    case 'ready':
+                        console.log('Apps Script app is ready');
+                        break;
+                }
+            }
+        });
+        
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', function() {
+            // Send message to iframe about URL change
+            iframe.contentWindow.postMessage({
+                type: 'popstate',
+                url: window.location.href
+            }, '*');
+        });
+        
+        // Optional: Handle iframe focus/blur for better UX
+        iframe.addEventListener('focus', function() {
+            document.body.style.background = '#ffffff';
+        });
+        
+        iframe.addEventListener('blur', function() {
+            document.body.style.background = '#f4f5fb';
+        });
+        
+        // Log successful setup (for debugging)
+        console.log('GitHub Pages wrapper loaded. Iframe URL:', iframeUrl);
+    </script>
+</body>
+</html>
